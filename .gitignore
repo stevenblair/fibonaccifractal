@@ -1,0 +1,5 @@
+node_modules/
+.npm-cache/
+.cache/
+test-results/
+playwright-report/

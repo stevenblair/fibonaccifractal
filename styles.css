@@ -1,0 +1,22 @@
+:root {
+  color-scheme: dark;
+  color: #dce9df;
+  background: #131c18;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+#viewport { position: fixed; inset: 0; overflow: hidden; }
+canvas { display: block; touch-action: none; cursor: crosshair; outline: none; }
+#render-status, .notice {
+  position: absolute;
+  z-index: 1;
+  top: 45%;
+  left: 12%;
+  right: 12%;
+  margin: 0;
+  color: #9aada0;
+  text-align: center;
+  line-height: 1.6;
+}

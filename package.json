@@ -1,0 +1,15 @@
+{
+  "name": "fibonacci-fractal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An interactive browser port of the 3D Fibonacci fractal Processing sketch.",
+  "license": "MIT",
+  "scripts": {
+    "start": "node scripts/serve.cjs",
+    "test": "node --test tests/geometry.test.cjs",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
