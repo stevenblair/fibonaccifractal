@@ -165,6 +165,10 @@ function expectCount(page, count) {
   return expect(page.locator("canvas")).toHaveAttribute("aria-label", new RegExp(`\\b${count} cubes\\.`));
 }
 
+async function cubeCount(page) {
+  return Number((await page.locator("canvas").getAttribute("aria-label")).match(/(\d+) cubes/)[1]);
+}
+
 async function changeToCount(page, count) {
   // Exercise the real keyboard handler in a burst, including beyond the point
   // where unnormalised Fibonacci values would overflow.
@@ -267,6 +271,100 @@ test("mouse clicks register once while moving, and releases outside the canvas d
   await expectCount(page, 12);
 });
 
+test("holding either mouse button repeats while moving and adds no extra step on release", async ({ page }) => {
+  await openView(page);
+  await recordDrawingGeometry(page);
+  await page.locator("canvas").evaluate((canvas) => {
+    window.releases = [];
+    const count = () => Number(canvas.getAttribute("aria-label").match(/(\d+) cubes/)[1]);
+    canvas.addEventListener("pointerup", () => window.releases.push({ before: count() }), true);
+    canvas.addEventListener("pointerup", () => { window.releases.at(-1).after = count(); });
+  });
+  await drawingAfter(page, () => page.mouse.move(600, 350));
+  await page.mouse.down();
+  await page.waitForTimeout(80);
+  await expectCount(page, 10);
+  await page.waitForTimeout(720);
+  const held = await cubeCount(page);
+  expect(held).toBeGreaterThanOrEqual(15);
+  await page.mouse.move(660, 390, { steps: 4 });
+  await page.waitForTimeout(200);
+  expect(await cubeCount(page)).toBeGreaterThan(held);
+  await page.mouse.up();
+  const added = await cubeCount(page);
+  await page.waitForTimeout(250);
+  await expectCount(page, added);
+  expectFitsViewport(await settledDrawing(page));
+
+  await page.mouse.down({ button: "right" });
+  await page.waitForTimeout(80);
+  await expectCount(page, added);
+  await page.waitForTimeout(720);
+  expect(await cubeCount(page)).toBeLessThanOrEqual(added - 5);
+  await page.mouse.move(620, 360, { steps: 4 });
+  await page.waitForTimeout(200);
+  await page.mouse.up({ button: "right" });
+  const removed = await cubeCount(page);
+  await page.waitForTimeout(250);
+  await expectCount(page, removed);
+  expectFitsViewport(await settledDrawing(page));
+  const releases = await page.evaluate(() => window.releases);
+  expect(releases).toHaveLength(2);
+  for (const release of releases) expect(release.after).toBe(release.before);
+});
+
+test("leaving the viewport, losing focus, or cancelling capture stops a held button", async ({ page }) => {
+  await openView(page);
+  const canvas = page.locator("canvas");
+  await canvas.evaluate((canvas) => {
+    canvas.addEventListener("pointerdown", (event) => { window.heldPointerId = event.pointerId; });
+  });
+  const cancellations = [
+    () => page.mouse.move(-10, 350),
+    () => page.evaluate(() => window.dispatchEvent(new Event("blur"))),
+    () => canvas.evaluate((canvas) => canvas.releasePointerCapture(window.heldPointerId)),
+    () => canvas.dispatchEvent("pointercancel", { pointerId: 1, pointerType: "mouse" }),
+  ];
+  for (const cancel of cancellations) {
+    await page.mouse.move(600, 350);
+    const before = await cubeCount(page);
+    await page.mouse.down();
+    await page.waitForTimeout(450);
+    expect(await cubeCount(page)).toBeGreaterThan(before);
+    await cancel();
+    // Give the browser a frame to deliver lostpointercapture.
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    const cancelled = await cubeCount(page);
+    await page.waitForTimeout(250);
+    await expectCount(page, cancelled);
+    await page.mouse.up();
+    await expectCount(page, cancelled);
+  }
+  // A cancelled gesture must not prevent the next ordinary click.
+  const before = await cubeCount(page);
+  await canvas.click();
+  await expectCount(page, before + 1);
+});
+
+test("a held right button stops at the minimum and leaves the renderer idle", async ({ page }) => {
+  await openView(page);
+  await recordDrawingGeometry(page);
+  await changeToCount(page, 2);
+  await page.locator("canvas").press("r");
+  await drawingAfter(page, () => page.mouse.move(600, 350));
+  await page.mouse.down({ button: "right" });
+  await page.waitForTimeout(800);
+  await expectCount(page, 1);
+  expectFitsViewport(await settledDrawing(page));
+  const frame = await page.evaluate(() => window.drawingGeometry.frame);
+  await page.waitForTimeout(250);
+  expect(await page.evaluate(() => window.drawingGeometry.frame)).toBe(frame);
+  await page.mouse.up({ button: "right" });
+  await expectCount(page, 1);
+  await page.locator("canvas").click();
+  await expectCount(page, 2);
+});
+
 test("changing direction mid-animation is continuous, and the wheel stops automatic zoom", async ({ page }) => {
   await openView(page);
   await recordDrawingGeometry(page);
@@ -277,7 +375,7 @@ test("changing direction mid-animation is continuous, and the wheel stops automa
   const reversing = await drawingAfter(page, async () => {
     reversingFrom = await page.evaluate(() => {
       const cubes = window.drawingGeometry.cubes;
-      document.querySelector("canvas").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+      document.querySelector("canvas").dispatchEvent(new KeyboardEvent("keydown", { key: "-", bubbles: true }));
       return cubes;
     });
   });
@@ -426,6 +524,8 @@ test.describe("touch", () => {
     const session = await context.newCDPSession(page);
     const dragged = await drawingAfter(page, async () => {
       await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 80, y: 80 }] });
+      await page.waitForTimeout(500);
+      await expectCount(page, 11);
       await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 140, y: 120 }] });
       await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     });

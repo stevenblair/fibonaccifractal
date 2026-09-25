@@ -28,12 +28,15 @@ only to this computer and serves only the browser app files.
 | Rotate | Move the mouse over the view; drag on a touchscreen | Arrow keys |
 | Add a cube and zoom out | Click or tap | + |
 | Remove a cube and zoom in | Right-click | − |
+| Add or remove repeatedly | Hold the left or right mouse button | Hold + or − |
 | Zoom manually | Scroll | — |
 | Switch filled/wireframe | — | W |
 | Reset rotation and zoom | — | R |
 
 Click or Tab to focus the canvas for keyboard input. Mouse clicks register while
-moving; touch drags rotate without adding cubes. Both adding and removing animate
+moving; touch drags rotate without adding cubes. Holding either mouse button
+starts repeating after 300 ms, at about 12 cubes per second. Releasing the button,
+leaving the canvas, or losing focus stops repetition. Both adding and removing animate
 the scale around the spiral's fixed centre, preserving rotation. Reversing
 direction during an animation continues from the displayed scale. Scrolling
 stops the automatic animation and adjusts zoom. Reduced-motion preferences skip
@@ -62,8 +65,9 @@ Each update constructs at most 100 cubes, independent of the total count.
 Geometry outside the camera's clipping range and boxes smaller than a quarter
 of a screen pixel are skipped when drawing.
 
-A bounding sphere fits the geometry at every angle. Zoom transitions take 420 ms
-and are bounded to keep rapid sequences of inputs within floating-point range.
+A bounding sphere fits the geometry at every angle. Zoom transitions take 420 ms,
+or 160 ms while holding a mouse button, and are bounded to keep rapid sequences
+of inputs within floating-point range.
 The narrow perspective is retained with an explicitly positioned camera.
 The view redraws only on input, resize, or during the short zoom animation.
 
